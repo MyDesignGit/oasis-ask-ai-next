@@ -106,7 +106,7 @@ export default function ChatPage() {
   
     setShowWelcome(false);
     const userMessage = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev: Message[]) => [...prev, userMessage as Message]);
     setInput('');
     setIsLoading(true);
   
