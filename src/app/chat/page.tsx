@@ -123,106 +123,183 @@ export default function ChatPage() {
 
 
   const handleSendMessage = async () => {
+
     if (!input.trim() || isLoading) return;
+
   
+
     setShowWelcome(false);
+
     const userMessage = { role: 'user', content: input };
+
     setMessages(prev => [...prev, userMessage]);
+
     setInput('');
+
     setIsLoading(true);
+
   
+
     try {
+
       const response = await fetch('/api', {
+
         method: 'POST',
+
         headers: { 'Content-Type': 'application/json' },
+
         body: JSON.stringify({
+
           messages: [...messages, userMessage],
+
           userInfo: { name: user?.firstName },
+
         }),
+
       });
+
   
+
       if (!response.ok) throw new Error('Failed to fetch response');
+
   
+
       const reader = response.body?.getReader();
-      if (!reader) throw new Error('No reader available');
+
+      let fullResponse = '';
+
   
-      let accumulatedResponse = '';
-      const decoder = new TextDecoder();
-  
+
       while (true) {
+
         const { value, done } = await reader.read();
+
         if (done) break;
+
   
-        const text = decoder.decode(value);
-        const lines = text.split('\n');
-  
+
+        // Decode the chunk and accumulate
+
+        const text = new TextDecoder().decode(value);
+
+        const lines = text.split('\n').filter(line => line.trim() !== '');
+
+        
+
         for (const line of lines) {
+
           if (line.startsWith('data: ')) {
+
             try {
-              const json = JSON.parse(line.slice(5));
-              if (json.choices?.[0]?.delta?.content) {
-                accumulatedResponse += json.choices[0].delta.content;
-  
-                // Clean up the response
-                const cleanedResponse = accumulatedResponse
-                  .replace(/<[^>]*>/g, '') // Remove HTML tags
-                  .replace(/\n\s*\n/g, '\n') // Normalize multiple newlines
-                  .replace(/([.!?])\s+/g, '$1\n') // Add newline after sentences
-                  .replace(/^\d+:\s*/gm, '') // Remove number prefixes
-                  .replace(/"\s*/g, '') // Remove quotes
+
+              const data = JSON.parse(line.slice(5));
+
+              if (data.choices?.[0]?.delta?.content) {
+
+                fullResponse += data.choices[0].delta.content;
+
+                
+
+                // Format the full response
+
+                const formattedResponse = fullResponse
+
+                  .replace(/\n\s*\n/g, '\n\n') // Standardize paragraph breaks
+
+                  .replace(/([.!?])\s+(?=[A-Z])/g, '$1\n\n') // Add breaks after sentences
+
+                  .replace(/\n{3,}/g, '\n\n') // Remove excessive line breaks
+
                   .trim();
+
   
+
+                // Update message with formatted response
+
                 setMessages(prev => [
+
                   ...prev.slice(0, -1),
-                  { role: 'assistant', content: cleanedResponse }
+
+                  { role: 'assistant', content: formattedResponse }
+
                 ]);
+
               }
+
             } catch (e) {
-              console.warn('JSON parse error:', e);
+
+              console.warn('Parsing chunk failed:', e);
+
             }
+
           }
+
         }
+
       }
+
     } catch (error) {
+
       console.error('Error:', error);
+
       setMessages(prev => [
+
         ...prev,
+
         { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }
+
       ]);
+
     } finally {
+
       setIsLoading(false);
+
       if (textareaRef.current) {
+
         textareaRef.current.style.height = 'auto';
+
       }
+
     }
+
   };
 
-  const Message = ({ content, isUser }: { content: string; isUser: boolean }) => {
-    // Clean and format the content
-    const formattedContent = content
-      .replace(/<br\s*\/?>/gi, ' ') // Remove <br> tags and replace with space
-      .replace(/\s+/g, ' ') // Normalize spaces
-      .replace(/\n\s*\n/g, '\n') // Remove extra newlines
-      .trim();
   
-    return (
-      <div
-        className={`max-w-[80%] p-4 rounded-lg ${
-          isUser
-            ? 'bg-[#874487] text-white ml-auto'
-            : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
-        }`}
-      >
-        <div className="prose dark:prose-invert max-w-none">
-          {formattedContent.split('\n').map((paragraph, index) => (
-            <p key={index} className={index > 0 ? 'mt-4' : ''}>
-              {paragraph.trim()}
-            </p>
-          ))}
-        </div>
-      </div>
-    );
-  };
+
+  
+
+  const Message = ({ content, isUser }: { content: string; isUser: boolean }) => (
+
+    <div
+
+      className={`max-w-[80%] p-4 rounded-lg ${
+
+        isUser
+
+          ? 'bg-[#874487] text-white ml-auto'
+
+          : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
+
+      }`}
+
+    >
+
+      {content.split('\n').map((line, index) => (
+
+        <React.Fragment key={index}>
+
+          {line}
+
+          {index < content.split('\n').length - 1 && <br />}
+
+        </React.Fragment>
+
+      ))}
+
+    </div>
+
+  );
+
 
 
   
