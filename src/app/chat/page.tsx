@@ -1,45 +1,24 @@
 'use client';
-
-
-
 import React from 'react';
-
 import { useState, useEffect, useRef, KeyboardEvent } from 'react';
-
 import Image from 'next/image';
-
 import { Menu, MessageSquare, Plus, Phone } from 'lucide-react';
-
 import { ThemeToggle } from '@/components/ThemeToggle';
-
 import { UserProfileMenu } from '@/components/UserProfileMenu';
-
 import { useUser } from '@clerk/nextjs';
-
 import WelcomeSection from '@/components/WelcomeSection';
-
-
-
+import MessageFormatter from '@/components/MessageFormatter';
 interface Message {
-
   role: 'assistant' | 'user';
-
   content: string;
-
 }
-
-
 
 const recentChats = [
 
   { id: 1, title: 'What is IVF?' },
-
   { id: 2, title: 'Male Fertility Issues' },
-
   { id: 3, title: 'IVF myths debunked' },
-
   { id: 4, title: 'Medical tests before IVF' },
-
 ];
 
 
@@ -141,11 +120,11 @@ export default function ChatPage() {
       });
   
       if (!response.ok) throw new Error('Failed to fetch response');
-      if (!response.body) throw new Error('No response body');
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No reader available');
   
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
       let accumulatedResponse = '';
+      const decoder = new TextDecoder();
   
       while (true) {
         const { value, done } = await reader.read();
@@ -160,10 +139,11 @@ export default function ChatPage() {
               const data = JSON.parse(line.slice(5));
               accumulatedResponse += data.text;
   
-              // Format and update the message
+              // Format the response while preserving markdown
               const formattedResponse = accumulatedResponse
-                .replace(/\n\s*\n/g, '\n\n') // Standardize paragraph breaks
-                .replace(/([.!?])\s+(?=[A-Z])/g, '$1\n\n') // Add breaks after sentences
+                .replace(/\n{3,}/g, '\n\n') // Normalize multiple newlines
+                .replace(/(?<!\n)###/g, '\n###') // Ensure headings start on new lines
+                .replace(/\*\*(?!\s)(.+?)(?<!\s)\*\*/g, '**$1**') // Preserve bold text
                 .trim();
   
               setMessages(prev => [
@@ -192,40 +172,22 @@ export default function ChatPage() {
 
   
 
-  
-
   const Message = ({ content, isUser }: { content: string; isUser: boolean }) => (
-
     <div
-
       className={`max-w-[80%] p-4 rounded-lg ${
-
         isUser
-
           ? 'bg-[#874487] text-white ml-auto'
-
           : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
-
       }`}
-
     >
-
-      {content.split('\n').map((line, index) => (
-
-        <React.Fragment key={index}>
-
-          {line}
-
-          {index < content.split('\n').length - 1 && <br />}
-
-        </React.Fragment>
-
-      ))}
-
+      {isUser ? (
+        <p>{content}</p>
+      ) : (
+        <MessageFormatter content={content} />
+      )}
     </div>
-
   );
-
+  
 
 
   
