@@ -1,8 +1,9 @@
 // app/api/route.ts
 import { openai } from '@ai-sdk/openai';
 import { streamText } from 'ai';
-import { auth } from '@clerk/nextjs/server'
-
+import { auth, clerkClient, currentUser } from '@clerk/nextjs/server';
+import { NextApiRequest, NextApiResponse } from 'next';
+// import { console } from 'inspector';
 
 interface UserInfo {
   name: string | null;
@@ -11,91 +12,90 @@ interface UserInfo {
   age?: string;
 }
 
+
+// export default async function Page() {
+//   // Get the userId from auth() -- if null, the user is not signed in
+//   const { userId } = await auth()
+
+//   if (userId) {
+   
+//   }
+
+//   // Get the Backend API User object when you need access to the user's information
+//   const user = await currentUser()
+//   // Use `user` to render user details or create UI elements
+
+// }
 const getUserInfo = async (): Promise<UserInfo> => {
-  const { userId } = auth();
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
+  const { userId } = await auth()
+  if (!userId) throw new Error('Unauthorized');
   
-  const user = await clerkClient.users.getUser(userId);
+  const user = await currentUser()
+  if (!user) throw new Error('User not found');
+
+  console.log("User details from Clerk:", user.firstName);
+
   return {
-    name: user.firstName,
-    email: user.emailAddresses[0]?.emailAddress || null,
-    gender: user.publicMetadata?.gender as string,
-    age: user.publicMetadata?.age as string
+    name: user.firstName ?? null,
+    email: user.emailAddresses[0]?.emailAddress ?? null,
+    gender: (user.publicMetadata as { gender?: string })?.gender ?? undefined,
+    age: (user.publicMetadata as { age?: string })?.age ?? undefined,
   };
 };
 export const runtime = 'edge';
 
-// Enhanced system prompt with conversation memory instructions
-const systemPrompt = (userInfo: UserInfo) => `
-You are an AI assistant for Oasis Fertility clinic.
-${userInfo.name ? `You are speaking with ${userInfo.name}` : 'You are speaking with a user'} 
-${userInfo.gender ? `(Gender: ${userInfo.gender}` : ''} 
-${userInfo.age ? `, Age: ${userInfo.age}` : ''})
-${userInfo.email ? `(Email: ${userInfo.email})` : ''}.
-
-Important conversation guidelines:
-- Always address the user as "${userInfo.name}"
-- Reference previous parts of the conversation when relevant
-- Maintain context from earlier questions
-- Build upon previously discussed topics
-- If referring to past information, mention "as we discussed earlier"
-- Keep track of the user's specific concerns and interests
-
-Format your responses:
-- Start each response with "${userInfo.name},"
-- Write in clear, complete paragraphs
-- Use proper sentence structure
-- Keep information organized and easy to read
-- after Every coverstion check if they Provide Gender and Age, if not ask them `;
-
 export async function POST(req: Request) {
   try {
-    const { messages, userInfo } = await req.json();
-
+    const { messages } = await req.json();
+  const userInfo = await getUserInfo();
     let conversationMemory = '';
-    
-    // Build conversation memory from previous messages
+
     messages.forEach((msg: any, index: number) => {
       if (msg.role === 'user') {
         conversationMemory += `User asked: ${msg.content}\n`;
       } else if (msg.role === 'assistant' && messages[index - 1]?.role === 'user') {
-        conversationMemory += `Previous response about "${messages[index - 1].content}": ${msg.content}\n`;
+        conversationMemory += `Assistant responded to "${messages[index - 1].content}": ${msg.content}\n`;
       }
     });
 
-    // Get the last user message
     const lastMessage = messages[messages.length - 1];
 
-    // Create the stream with conversation memory
     const { textStream } = await streamText({
       model: openai('gpt-4-turbo'),
-      prompt: lastMessage.content,
-      // systemPrompt: `${systemPrompt(userInfo)}\n\nConversation history:\n${conversationMemory}`,
+      messages: [
+        {
+          role: 'system',
+          content: `
+           You are an AI assistant for Oasis Fertility Clinic. 
+        ${userInfo.name ? `Address the user as "${userInfo.name}"` : 'Ask for the user\'s name if not provided'}
+        ${!userInfo.gender ? 'Politely ask for the user\'s gender if not already provided' : ''}
+        ${!userInfo.age ? 'Politely ask for the user\'s age if not already provided' : ''}
+        Focus solely on topics related to Oasis Fertility Clinic.
+
+        Format your responses:
+        - Start each response with a polite greeting.
+        - Write in clear, concise paragraphs.
+        - Keep information organized, relevant to fertility, and easy to read.
+        - Politely redirect any unrelated questions back to Oasis Fertility Clinic.`,
+        },
+        {
+          role: 'user',
+          content: lastMessage.content
+        }
+      ],
       temperature: 0.7,
       async onFinish({ text, usage, finishReason }) {
-        // Optional: Log conversation metrics
-        console.log('Conversation metrics:', {
-          usage,
-          finishReason,
-          messageCount: messages.length,
-          lastQuery: lastMessage.content
-        });
+        console.log('Conversation metrics:', { usage, finishReason, messageCount: messages.length, lastQuery: lastMessage.content });
+        // console.log("User details from Clerk:", user?.firstName ||"Test");
       },
     });
 
-    // Create a readable stream
     const stream = new ReadableStream({
       async start(controller) {
-        try {
-          for await (const chunk of textStream) {
-            controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
-          }
-          controller.close();
-        } catch (error) {
-          controller.error(error);
+        for await (const chunk of textStream) {
+          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
         }
+        controller.close();
       },
     });
 
@@ -109,12 +109,9 @@ export async function POST(req: Request) {
 
   } catch (error: any) {
     console.error('Error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }), 
-      { 
-        status: 500, 
-        headers: { 'Content-Type': 'application/json' } 
-      }
-    );
+    return new Response(JSON.stringify({ error: 'Internal server error', details: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }
