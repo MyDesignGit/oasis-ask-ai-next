@@ -123,145 +123,71 @@ export default function ChatPage() {
 
 
   const handleSendMessage = async () => {
-
     if (!input.trim() || isLoading) return;
-
   
-
     setShowWelcome(false);
-
     const userMessage = { role: 'user', content: input };
-
     setMessages(prev => [...prev, userMessage]);
-
     setInput('');
-
     setIsLoading(true);
-
   
-
     try {
-
       const response = await fetch('/api', {
-
         method: 'POST',
-
         headers: { 'Content-Type': 'application/json' },
-
         body: JSON.stringify({
-
           messages: [...messages, userMessage],
-
-          userInfo: { name: user?.firstName },
-
         }),
-
       });
-
   
-
       if (!response.ok) throw new Error('Failed to fetch response');
-
+      if (!response.body) throw new Error('No response body');
   
-
-      const reader = response.body?.getReader();
-
-      let fullResponse = '';
-
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedResponse = '';
   
-
       while (true) {
-
         const { value, done } = await reader.read();
-
         if (done) break;
-
   
-
-        // Decode the chunk and accumulate
-
-        const text = new TextDecoder().decode(value);
-
-        const lines = text.split('\n').filter(line => line.trim() !== '');
-
-        
-
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+  
         for (const line of lines) {
-
           if (line.startsWith('data: ')) {
-
             try {
-
               const data = JSON.parse(line.slice(5));
-
-              if (data.choices?.[0]?.delta?.content) {
-
-                fullResponse += data.choices[0].delta.content;
-
-                
-
-                // Format the full response
-
-                const formattedResponse = fullResponse
-
-                  .replace(/\n\s*\n/g, '\n\n') // Standardize paragraph breaks
-
-                  .replace(/([.!?])\s+(?=[A-Z])/g, '$1\n\n') // Add breaks after sentences
-
-                  .replace(/\n{3,}/g, '\n\n') // Remove excessive line breaks
-
-                  .trim();
-
+              accumulatedResponse += data.text;
   
-
-                // Update message with formatted response
-
-                setMessages(prev => [
-
-                  ...prev.slice(0, -1),
-
-                  { role: 'assistant', content: formattedResponse }
-
-                ]);
-
-              }
-
+              // Format and update the message
+              const formattedResponse = accumulatedResponse
+                .replace(/\n\s*\n/g, '\n\n') // Standardize paragraph breaks
+                .replace(/([.!?])\s+(?=[A-Z])/g, '$1\n\n') // Add breaks after sentences
+                .trim();
+  
+              setMessages(prev => [
+                ...prev.slice(0, -1),
+                { role: 'assistant', content: formattedResponse }
+              ]);
             } catch (e) {
-
-              console.warn('Parsing chunk failed:', e);
-
+              console.warn('JSON parse error:', e);
             }
-
           }
-
         }
-
       }
-
     } catch (error) {
-
       console.error('Error:', error);
-
       setMessages(prev => [
-
         ...prev,
-
         { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }
-
       ]);
-
     } finally {
-
       setIsLoading(false);
-
       if (textareaRef.current) {
-
         textareaRef.current.style.height = 'auto';
-
       }
-
     }
-
   };
 
   
