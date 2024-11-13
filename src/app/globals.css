@@ -19,3 +19,21 @@ body {
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.message-content p {
+  margin-bottom: 1rem;
+}
+
+.message-content p:last-child {
+  margin-bottom: 0;
+}
+
+.message-content ul,
+.message-content ol {
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+}
+
+.message-content li {
+  margin-bottom: 0.5rem;
+}

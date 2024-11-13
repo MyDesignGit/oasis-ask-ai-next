@@ -123,167 +123,106 @@ export default function ChatPage() {
 
 
   const handleSendMessage = async () => {
-
     if (!input.trim() || isLoading) return;
-
   
-
     setShowWelcome(false);
-
     const userMessage = { role: 'user', content: input };
-
     setMessages(prev => [...prev, userMessage]);
-
     setInput('');
-
     setIsLoading(true);
-
   
-
     try {
-
       const response = await fetch('/api', {
-
         method: 'POST',
-
         headers: { 'Content-Type': 'application/json' },
-
         body: JSON.stringify({
-
           messages: [...messages, userMessage],
-
           userInfo: { name: user?.firstName },
-
         }),
-
       });
-
   
-
       if (!response.ok) throw new Error('Failed to fetch response');
-
   
-
       const reader = response.body?.getReader();
-
       if (!reader) throw new Error('No reader available');
-
   
-
       let accumulatedResponse = '';
-
       const decoder = new TextDecoder();
-
   
-
       while (true) {
-
         const { value, done } = await reader.read();
-
         if (done) break;
-
   
-
-        const chunk = decoder.decode(value, { stream: true });
-
+        const text = decoder.decode(value);
+        const lines = text.split('\n');
   
-
-        // Clean up unwanted characters
-
-        let cleanedChunk = chunk.replace(/0:|"|\\/g, '');
-
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const json = JSON.parse(line.slice(5));
+              if (json.choices?.[0]?.delta?.content) {
+                accumulatedResponse += json.choices[0].delta.content;
   
-
-        // Apply paragraph and bold formatting
-
-        cleanedChunk = cleanedChunk
-
-          .replace(/([.!?])\s+(?=[A-Z])/g, '$1.nn ') // Add '.nn ' at the end of each sentence
-
-          .replace(/\b(myth|IVF|treatment|fertility)\b/gi, '**$&**') // Bold specific terms
-
-          .replace(/\.nn\s+/g, '.\n\n'); // Replace '.nn' with paragraph breaks (two newlines)
-
+                // Clean up the response
+                const cleanedResponse = accumulatedResponse
+                  .replace(/<[^>]*>/g, '') // Remove HTML tags
+                  .replace(/\n\s*\n/g, '\n') // Normalize multiple newlines
+                  .replace(/([.!?])\s+/g, '$1\n') // Add newline after sentences
+                  .replace(/^\d+:\s*/gm, '') // Remove number prefixes
+                  .replace(/"\s*/g, '') // Remove quotes
+                  .trim();
   
-
-        accumulatedResponse += cleanedChunk;
-
-  
-
-        setMessages(prev => [
-
-          ...prev.slice(0, -1),
-
-          { role: 'assistant', content: accumulatedResponse },
-
-        ]);
-
+                setMessages(prev => [
+                  ...prev.slice(0, -1),
+                  { role: 'assistant', content: cleanedResponse }
+                ]);
+              }
+            } catch (e) {
+              console.warn('JSON parse error:', e);
+            }
+          }
+        }
       }
-
     } catch (error) {
-
       console.error('Error:', error);
-
       setMessages(prev => [
-
         ...prev,
-
-        { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' },
-
+        { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }
       ]);
-
     } finally {
-
       setIsLoading(false);
-
       if (textareaRef.current) {
-
         textareaRef.current.style.height = 'auto';
-
       }
-
     }
-
   };
 
+  const Message = ({ content, isUser }: { content: string; isUser: boolean }) => {
+    // Clean and format the content
+    const formattedContent = content
+      .replace(/<br\s*\/?>/gi, ' ') // Remove <br> tags and replace with space
+      .replace(/\s+/g, ' ') // Normalize spaces
+      .replace(/\n\s*\n/g, '\n') // Remove extra newlines
+      .trim();
   
-
-  
-
-  
-
-  const Message = ({ content, isUser }: { content: string; isUser: boolean }) => (
-
-    <div
-
-      className={`max-w-[80%] p-4 rounded-lg ${
-
-        isUser
-
-          ? 'bg-[#874487] text-white ml-auto'
-
-          : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
-
-      }`}
-
-    >
-
-      {content.split('\n').map((line, index) => (
-
-        <React.Fragment key={index}>
-
-          {line}
-
-          {index < content.split('\n').length - 1 && <br />}
-
-        </React.Fragment>
-
-      ))}
-
-    </div>
-
-  );
-
+    return (
+      <div
+        className={`max-w-[80%] p-4 rounded-lg ${
+          isUser
+            ? 'bg-[#874487] text-white ml-auto'
+            : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
+        }`}
+      >
+        <div className="prose dark:prose-invert max-w-none">
+          {formattedContent.split('\n').map((paragraph, index) => (
+            <p key={index} className={index > 0 ? 'mt-4' : ''}>
+              {paragraph.trim()}
+            </p>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
 
   
