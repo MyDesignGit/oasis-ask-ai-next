@@ -1,23 +1,23 @@
-// import { auth } from '@clerk/nextjs';
+import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
 import Image from 'next/image';
 import Navbar from '@/components/Navbar';
 
 export default async function Home() {
-  // const { userId } = auth();
+  const { userId } = await auth();
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <Navbar />
       
       <main className="flex-1">
-        <div className="container mx-auto px-4 py-16">
+        <div className="container mx-auto px-4 ">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Left Content */}
             <div className="space-y-8">
-              <h1 className="text-6xl font-light">
-                <span className="text-[#874487]">Ask</span>{' '}
-                <span className="text-[#FF9B9B]">Oasis</span>
+              <h1 className="text-8xl font-bold bg-gradient-to-r from-pink-400 via-pink-300 to-orange-400 text-transparent bg-clip-text">
+                <span className="bg-gradient-to-r from-oasis-purple via-pink-300 to-orange-400 text-transparent bg-clip-text">Ask Oasis</span>{' '}
+               
               </h1>
               
               <div className="space-y-6">
@@ -38,17 +38,17 @@ export default async function Home() {
                 </Link>
               </div>
 
-              {/* <Link 
+              <Link 
                 href={userId ? "/chat" : "/sign-in"}
-                className="inline-block px-10 py-3 bg-[#FF9B9B] text-white rounded-full hover:bg-[#ff8484] transition-colors transform hover:-translate-y-0.5 hover:shadow-lg"
+                className="inline-block px-10 py-3 bg-[#ff8484] text-white rounded-full hover:bg-[#ff8484] transition-colors transform hover:-translate-y-0.5 hover:shadow-lg"
               >
                 {userId ? "Start Chat" : "Sign In"}
-              </Link> */}
+              </Link>
             </div>
 
             {/* Right Image */}
             <div className="relative">
-              <div className="aspect-square rounded-full bg-[#FFE5E5] overflow-hidden shadow-2xl">
+              <div className="aspect-square  ">
                 <Image
                   src="/BGImage.webp"
                   alt="Happy Family"

@@ -11,10 +11,13 @@ export default {
     extend: {
       colors: {
         oasis: {
-          purple: '#874487',
-          'purple-dark': '#673367',
+          
+          purple: '#7e3e7e',
+          'purple-dark': '#7e3e7e',
           pink: '#FF9B9B',
           'pink-light': '#FFE5E5',
+          'oasis-dark': '#131314',
+          'oasis-light-dark': '#1d1e1f',
         }
       }
     },

@@ -117,7 +117,7 @@ const Navbar: React.FC = () => {
                 className="hover:opacity-80 transition-opacity"
               >
                 <Image 
-                  src="/whatsapp-icon.png" 
+                  src="/whatsapp.png" 
                   alt="WhatsApp"
                   width={32}
                   height={32}

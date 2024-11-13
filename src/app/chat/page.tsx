@@ -202,7 +202,7 @@ export default function ChatPage() {
 
       <div
 
-        className={`fixed lg:static inset-y-0 left-0 bg-white dark:bg-gray-900 transform 
+        className={`fixed lg:static inset-y-0 left-0 bg-white dark:bg-oasis-oasis-dark transform 
 
           transition-all duration-300 ease-in-out flex flex-col z-40 
 
@@ -244,13 +244,13 @@ export default function ChatPage() {
 
             ) : (
 
-              <div className="w-full flex justify-center">
+              <div className="w-full flex justify-center py-5">
 
-                <Image
+                {/* <Image
 
                   src="/oasis-icon.png"
 
-                  alt="Oasis Icon"
+                  // alt="Oasis Icon"
 
                   width={32}
 
@@ -260,7 +260,7 @@ export default function ChatPage() {
 
                   className="rounded-full"
 
-                />
+                /> */}
 
               </div>
 
@@ -348,7 +348,7 @@ export default function ChatPage() {
 
               className={`w-full text-left mb-1 flex items-center gap-2 text-gray-600 
 
-                dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg 
+                dark:oasis-light-dark hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg 
 
                 transition-colors ${isSidebarOpen ? 'p-2' : 'p-2 justify-center'}`}
 
@@ -406,11 +406,11 @@ export default function ChatPage() {
 
       {/* Main Chat Area */}
 
-      <div className="flex-1 flex flex-col bg-white dark:bg-gray-900">
+      <div className="flex-1 flex flex-col bg-white dark:bg-oasis-oasis-dark">
 
         {/* Chat Header */}
 
-        <div className="border-b border-gray-200 dark:border-gray-800 px-6 py-4 
+        <div className="px-6 py-4 
 
           flex items-center justify-between"
 
@@ -418,7 +418,7 @@ export default function ChatPage() {
 
           <h1 className="text-lg font-medium text-[#874487] dark:text-[#ff9b9b]">
 
-            Ask Oasis
+            {/* Ask Oasis */}
 
           </h1>
 
@@ -477,10 +477,20 @@ export default function ChatPage() {
   </div>
 
 </div>
+<p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
 
+{isLoading 
+
+  ? "Thinking..." 
+
+  : "Ask me anything about fertility treatments and services at Oasis Fertility"
+
+}
+
+</p>
         {/* Input Area */}
 
-        <div className="border-t border-gray-200 dark:border-gray-800 p-6">
+        <div className=" p-6">
 
           <div className="max-w-4xl mx-auto relative">
 
@@ -566,17 +576,7 @@ export default function ChatPage() {
 
           </div>
 
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-
-            {isLoading 
-
-              ? "Thinking..." 
-
-              : "Ask me anything about fertility treatments and services at Oasis Fertility"
-
-            }
-
-          </p>
+         
 
         </div>
 

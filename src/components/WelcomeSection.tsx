@@ -36,7 +36,7 @@ const WelcomeSection = ({
             className="px-6 py-3 rounded-full bg-[#F8F9FE] hover:bg-[#F0F2FC] 
               text-gray-700 text-sm
               transition-all duration-200
-              border border-gray-100 hover:border-gray-200"
+              hover:border-gray-200 dark:bg-oasis-oasis-light-dark dark:text-gray-600"
           >
             {prompt}
           </button>

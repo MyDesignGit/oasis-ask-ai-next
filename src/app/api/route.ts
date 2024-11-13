@@ -11,21 +11,6 @@ interface UserInfo {
   gender?: string;
   age?: string;
 }
-
-
-// export default async function Page() {
-//   // Get the userId from auth() -- if null, the user is not signed in
-//   const { userId } = await auth()
-
-//   if (userId) {
-   
-//   }
-
-//   // Get the Backend API User object when you need access to the user's information
-//   const user = await currentUser()
-//   // Use `user` to render user details or create UI elements
-
-// }
 const getUserInfo = async (): Promise<UserInfo> => {
   const { userId } = await auth()
   if (!userId) throw new Error('Unauthorized');
@@ -72,11 +57,25 @@ export async function POST(req: Request) {
         ${!userInfo.age ? 'Politely ask for the user\'s age if not already provided' : ''}
         Focus solely on topics related to Oasis Fertility Clinic.
 
+        Important guidelines:
+        - Avoid overusing the user's name after the initial greeting unless necessary.
+        - Reference prior parts of the conversation when helpful.
+        - Politely redirect any unrelated questions back to Oasis Fertility Clinic.
+          
         Format your responses:
-        - Start each response with a polite greeting.
+        - Start each response with a polite greeting with user name. later you can use name whwen it required according o the conversation
         - Write in clear, concise paragraphs.
         - Keep information organized, relevant to fertility, and easy to read.
-        - Politely redirect any unrelated questions back to Oasis Fertility Clinic.`,
+        - Politely redirect any unrelated questions back to Oasis Fertility Clinic.
+        
+        At the end of each relevant response, politely ask if the user would like more information. 
+        Suggest specific categories of Oasis Fertility Clinic information they might be interested in, such as:
+        - Fertility treatments
+        - Success rates
+        - Consultation process
+        - Clinic locations
+        - Support services
+        - Patient testimonials`,
         },
         {
           role: 'user',
