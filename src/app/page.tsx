@@ -39,7 +39,7 @@ export default async function Home() {
               </div>
 
               <Link 
-                href={userId ? "/chat" : "/sign-in"}
+                href={"/chat" }
                 className="inline-block px-10 py-3 bg-[#ff8484] text-white rounded-full hover:bg-[#ff8484] transition-colors transform hover:-translate-y-0.5 hover:shadow-lg"
               >
                 {userId ? "Start Chat" : "Sign In"}
