@@ -23,6 +23,7 @@ interface ChatSession {
   updatedAt: string;
 }
 
+
 // Constants for storage
 const CHAT_HISTORY_KEY = 'oasis_chat_history';
 const MAX_CHATS = 10;
@@ -196,13 +197,15 @@ export default function ChatPage() {
     if (!input.trim() || isLoading) return;
 
     setShowWelcome(false);
-    const userMessage = { role: 'user' as const, content: input };
+    const userMessage: Message = { 
+      role: 'user',
+      content: input 
+    };
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setInput('');
     setIsLoading(true);
 
-    // Save or update chat session
     const sessionId = currentSessionId || saveChatSession(updatedMessages);
     if (sessionId) {
       setCurrentSessionId(sessionId);
@@ -224,9 +227,11 @@ export default function ChatPage() {
       let accumulatedResponse = '';
       const decoder = new TextDecoder();
 
-      let assistantMessage = { role: 'assistant' as const, content: '' };
-      const messagesWithAssistant = [...updatedMessages, assistantMessage];
-      setMessages(messagesWithAssistant);
+      const assistantMessage: Message = { 
+        role: 'assistant',
+        content: '' 
+      };
+      setMessages([...updatedMessages, assistantMessage]);
 
       while (true) {
         const { value, done } = await reader.read();
@@ -247,14 +252,13 @@ export default function ChatPage() {
                 .replace(/\*\*(?!\s)(.+?)(?<!\s)\*\*/g, '**$1**')
                 .trim();
 
-              const updatedMessagesWithResponse = [
+              const updatedMessagesWithResponse: Message[] = [
                 ...updatedMessages,
                 { role: 'assistant', content: formattedResponse }
               ];
               
               setMessages(updatedMessagesWithResponse);
               
-              // Update chat session
               if (sessionId) {
                 updateChatSession(sessionId, updatedMessagesWithResponse);
               }
@@ -266,14 +270,13 @@ export default function ChatPage() {
       }
     } catch (error) {
       console.error('Error:', error);
-      const errorMessage = { 
-        role: 'assistant' as const, 
+      const errorMessage: Message = { 
+        role: 'assistant', 
         content: 'Sorry, I encountered an error. Please try again.' 
       };
-      const messagesWithError = [...updatedMessages, errorMessage];
-      setMessages(messagesWithError);
+      setMessages([...updatedMessages, errorMessage]);
       if (currentSessionId) {
-        updateChatSession(currentSessionId, messagesWithError);
+        updateChatSession(currentSessionId, [...updatedMessages, errorMessage]);
       }
     } finally {
       setIsLoading(false);
