@@ -92,7 +92,7 @@ export default function ChatPage() {
   
     setShowWelcome(false);
     const userMessage = { role: 'user', content: input };
-    setMessages((prev: Message[]) => [...prev, userMessage as Message]);
+    setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
   
@@ -111,6 +111,9 @@ export default function ChatPage() {
   
       let accumulatedResponse = '';
       const decoder = new TextDecoder();
+  
+      let assistantMessage = { role: 'assistant', content: '' };
+      setMessages(prev => [...prev, assistantMessage]);
   
       while (true) {
         const { value, done } = await reader.read();
