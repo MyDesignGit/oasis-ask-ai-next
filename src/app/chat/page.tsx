@@ -8,7 +8,7 @@ import { UserProfileMenu } from '@/components/UserProfileMenu';
 import { useUser } from '@clerk/nextjs';
 import WelcomeSection from '@/components/WelcomeSection';
 import MessageFormatter from '@/components/MessageFormatter';
-
+//checking update version
 // Inline type definitions
 interface Message {
   role: 'assistant' | 'user';
