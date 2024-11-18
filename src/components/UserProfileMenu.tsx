@@ -1,16 +1,26 @@
 // components/UserProfileMenu.tsx
 'use client';
 
-import { useUser } from '@clerk/nextjs';
+import { useUser, SignInButton, SignedOut, useClerk  } from '@clerk/nextjs';
 import { useState } from 'react';
 import { LogOut, Settings, User } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link'
 
 export function UserProfileMenu() {
   const { user, isLoaded } = useUser();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { signOut } = useClerk(); // Hook to get sign out function
 
-  if (!isLoaded || !user) return null;
+  if (!isLoaded || !user) return (
+    <SignedOut>
+    <SignInButton>
+      <button className="inline-block px-10 py-3 bg-[#ff8484] text-white rounded-full hover:bg-[#ff8484] transition-colors transform hover:-translate-y-0.5 hover:shadow-lg">
+        Sign in
+      </button>
+    </SignInButton>
+  </SignedOut>
+  );
 
   return (
     <div className="relative">
@@ -57,7 +67,7 @@ export function UserProfileMenu() {
             Settings
           </button>
           <button
-            onClick={() => window.location.href = '/sign-out'}
+            onClick={() => signOut()} // Proper sign-out functionality
             className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
           >
             <LogOut size={16} />

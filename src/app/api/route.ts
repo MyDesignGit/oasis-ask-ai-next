@@ -3,6 +3,7 @@ import { openai } from '@ai-sdk/openai';
 import { streamText } from 'ai';
 import { auth, clerkClient, currentUser } from '@clerk/nextjs/server';
 import { NextApiRequest, NextApiResponse } from 'next';
+import { userInfo } from 'os';
 // import { console } from 'inspector';
 
 interface UserInfo {
@@ -11,12 +12,49 @@ interface UserInfo {
   gender?: string;
   age?: string;
 }
-const getUserInfo = async (): Promise<UserInfo> => {
-  const { userId } = await auth()
-  if (!userId) throw new Error('Unauthorized');
+// const getUserInfo = async (): Promise<UserInfo> => {
+//   const { userId } = await auth()
+//   if (!userId) throw new Error('Unauthorized');
   
-  const user = await currentUser()
-  if (!user) throw new Error('User not found');
+//   const user = await currentUser()
+//   if (!user) throw new Error('User not found');
+
+//   console.log("User details from Clerk:", user.firstName);
+
+//   return {
+//     name: user.firstName ?? null,
+//     email: user.emailAddresses[0]?.emailAddress ?? null,
+//     gender: (user.publicMetadata as { gender?: string })?.gender ?? undefined,
+//     age: (user.publicMetadata as { age?: string })?.age ?? undefined,
+//   };
+// };
+
+const getUserInfo = async (): Promise<UserInfo> => {
+  const { userId } = await auth();
+  
+  // Check if user is authenticated; if not, return guest user
+  if (!userId) {
+    console.log("Unauthorized access. Returning guest user.");
+    return {
+      name: "Guest",
+      email: null,
+      gender: undefined,
+      age: undefined,
+    };
+  }
+
+  const user = await currentUser();
+  
+  // If the user is not found, return guest user
+  if (!user) {
+    console.log("User not found. Returning guest user.");
+    return {
+      name: "Guest",
+      email: null,
+      gender: undefined,
+      age: undefined,
+    };
+  }
 
   console.log("User details from Clerk:", user.firstName);
 
@@ -27,6 +65,7 @@ const getUserInfo = async (): Promise<UserInfo> => {
     age: (user.publicMetadata as { age?: string })?.age ?? undefined,
   };
 };
+
 export const runtime = 'edge';
 
 export async function POST(req: Request) {

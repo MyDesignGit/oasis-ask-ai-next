@@ -42,7 +42,8 @@ export default async function Home() {
                 href={"/chat" }
                 className="inline-block px-10 py-3 bg-[#ff8484] text-white rounded-full hover:bg-[#ff8484] transition-colors transform hover:-translate-y-0.5 hover:shadow-lg"
               >
-                {userId ? "Start Chat" : "Sign In"}
+                {/* {userId ? "Start Chat" : "Sign In"} */}
+                Start Chat
               </Link>
             </div>
 
