@@ -1,4 +1,3 @@
-// app/page.tsx (continued)
 'use client';
 import React from 'react';
 import { useState, useEffect, useRef, KeyboardEvent } from 'react';
@@ -10,7 +9,22 @@ import { useUser } from '@clerk/nextjs';
 import WelcomeSection from '@/components/WelcomeSection';
 import MessageFormatter from '@/components/MessageFormatter';
 import { Message, ChatSession, UserInfo, FormState } from '@/types';
-import { CHAT_HISTORY_KEY, USER_INFO_KEY, getChatSessions, saveChatSession, updateChatSession } from '@/utils/storage';
+import { 
+  CHAT_HISTORY_KEY, 
+  USER_INFO_KEY, 
+  getChatSessions, 
+  saveChatSession, 
+  updateChatSession 
+} from '@/utils/storage';
+
+const MAX_CHATS = 10;
+
+const createMessage = (role: 'user' | 'assistant', content: string): Message => ({
+  id: crypto.randomUUID(),
+  timestamp: new Date().toISOString(),
+  role,
+  content
+});
 
 export default function ChatPage() {
   const { user } = useUser();
@@ -37,7 +51,7 @@ export default function ChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
-  // Load saved user info and chat sessions
+  // Load user info and chat sessions
   useEffect(() => {
     const savedUserInfo = localStorage.getItem(USER_INFO_KEY);
     if (savedUserInfo) {
@@ -55,7 +69,30 @@ export default function ChatPage() {
     }
   }, [userInfo]);
 
-  // Scroll to bottom when messages change
+  // Handle click outside sidebar (mobile)
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (window.innerWidth <= 1024 && 
+          sidebarRef.current && 
+          !sidebarRef.current.contains(event.target as Node)) {
+        setIsSidebarOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Responsive sidebar
+  useEffect(() => {
+    const handleResize = () => {
+      setIsSidebarOpen(window.innerWidth > 1024);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -69,62 +106,19 @@ export default function ChatPage() {
     }
   }, [input]);
 
-  const processUserInput = async () => {
-    if (!input.trim() || isLoading) return;
-
-    const userMessage: Message = {
-      id: crypto.randomUUID(),
-      timestamp: new Date().toISOString(),
-      role: 'user',
-      content: input
-    };
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
-    setInput('');
-
-    // Handle form state if active
-    if (formState.currentField) {
-      const updatedInfo = { ...userInfo, [formState.currentField]: input };
-      setUserInfo(updatedInfo);
-  
-      const fields: (keyof UserInfo)[] = ['name', 'phone', 'email', 'location', 'gender'];
-      const currentIndex = fields.indexOf(formState.currentField);
-      const nextField = currentIndex < fields.length - 1 ? fields[currentIndex + 1] : null;
-  
-      if (nextField) {
-        setFormState({ currentField: nextField, isComplete: false });
-        const promptMessage: Message = {
-          id: crypto.randomUUID(),
-          timestamp: new Date().toISOString(),
-          role: 'assistant',
-          content: `Thank you. Could you please provide your ${nextField}?`
-        };
-        setMessages(prev => [...prev, promptMessage]);
-      } else {
-        setFormState({ currentField: null, isComplete: true });
-        if (savedPrompt) {
-          await handleAIResponse(savedPrompt);
-          setSavedPrompt(null);
-        }
-      }
-    } else {
-      await handleAIResponse(input);
-    }
-  };
-
   const handleAIResponse = async (userInput: string) => {
     setIsLoading(true);
     try {
+      // Create user message with id and timestamp
+      const userMessage = createMessage('user', userInput);
+      const updatedMessages = [...messages, userMessage];
+      setMessages(updatedMessages);
+
       const response = await fetch('/api', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...messages, { 
-            id: crypto.randomUUID(),
-            timestamp: new Date().toISOString(),
-            role: 'user', 
-            content: userInput 
-          }],
+          messages: updatedMessages,
         }),
       });
 
@@ -135,13 +129,9 @@ export default function ChatPage() {
       let accumulatedResponse = '';
       const decoder = new TextDecoder();
 
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        timestamp: new Date().toISOString(),
-        role: 'assistant',
-        content: ''
-      };
-      setMessages(prev => [...prev, assistantMessage])
+      // Create initial assistant message
+      const assistantMessage = createMessage('assistant', '');
+      setMessages(prev => [...prev, assistantMessage]);
 
       while (true) {
         const { value, done } = await reader.read();
@@ -161,13 +151,13 @@ export default function ChatPage() {
                 .replace(/(?<!\n)###/g, '\n###')
                 .trim();
 
-                setMessages(prev => [
-                  ...prev.slice(0, -1),
-                  {
-                    ...prev[prev.length - 1],
-                    content: formattedResponse
-                  }
-                ]);
+              setMessages(prev => [
+                ...prev.slice(0, -1),
+                {
+                  ...prev[prev.length - 1],
+                  content: formattedResponse
+                }
+              ]);
             } catch (e) {
               console.warn('JSON parse error:', e);
             }
@@ -175,25 +165,51 @@ export default function ChatPage() {
         }
       }
 
-      // Update chat session
       if (!currentSessionId) {
-        const sessionId = saveChatSession([...messages, { role: 'user', content: userInput }]);
+        const sessionId = saveChatSession(updatedMessages);
         setCurrentSessionId(sessionId);
       } else {
-        updateChatSession(currentSessionId, [...messages, { role: 'user', content: userInput }]);
+        updateChatSession(currentSessionId, updatedMessages);
       }
 
     } catch (error) {
       console.error('Error:', error);
-      const errorMessage: Message = {
-        id: crypto.randomUUID(),
-        timestamp: new Date().toISOString(),
-        role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.'
-      };
+      const errorMessage = createMessage('assistant', 'Sorry, I encountered an error. Please try again.');
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const processUserInput = async () => {
+    if (!input.trim() || isLoading) return;
+
+    const userMessage = createMessage('user', input);
+    setInput('');
+
+    if (formState.currentField) {
+      const updatedInfo = { ...userInfo, [formState.currentField]: input };
+      setUserInfo(updatedInfo);
+
+      const fields: (keyof UserInfo)[] = ['name', 'phone', 'email', 'location', 'gender'];
+      const currentIndex = fields.indexOf(formState.currentField);
+      const nextField = currentIndex < fields.length - 1 ? fields[currentIndex + 1] : null;
+
+      if (nextField) {
+        setFormState({ currentField: nextField, isComplete: false });
+        const promptMessage = createMessage('assistant', `Thank you. Could you please provide your ${nextField}?`);
+        setMessages(prev => [...prev, userMessage, promptMessage]);
+      } else {
+        setFormState({ currentField: null, isComplete: true });
+        setMessages(prev => [...prev, userMessage]);
+        if (savedPrompt) {
+          await handleAIResponse(savedPrompt);
+          setSavedPrompt(null);
+        }
+      }
+    } else {
+      setMessages(prev => [...prev, userMessage]);
+      await handleAIResponse(input);
     }
   };
 
@@ -202,25 +218,15 @@ export default function ChatPage() {
     if (!formState.isComplete && !userInfo.name) {
       setSavedPrompt(prompt);
       setFormState({ currentField: 'name', isComplete: false });
-      const welcomeMessage: Message = {
-        id: crypto.randomUUID(),
-        timestamp: new Date().toISOString(),
-        role: 'assistant',
-        content: 'Welcome! Before we proceed, could you please tell me your name?'
-      };
+      const welcomeMessage = createMessage('assistant', 'Welcome! Before we proceed, could you please tell me your name?');
       setMessages([welcomeMessage]);
     } else {
-      const userMessage: Message = {
-        id: crypto.randomUUID(),
-        timestamp: new Date().toISOString(),
-        role: 'user',
-        content: prompt
-      };
+      const userMessage = createMessage('user', prompt);
       setMessages(prev => [...prev, userMessage]);
       handleAIResponse(prompt);
     }
   };
-  
+
   const handleKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
