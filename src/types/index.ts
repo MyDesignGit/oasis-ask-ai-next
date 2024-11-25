@@ -20,3 +20,25 @@ export interface Message {
     name?: string;
   }
   
+
+  export interface ChatSession {
+    id: string;
+    title: string;
+    messages: Message[];
+    createdAt: string;
+    updatedAt: string;
+  }
+  
+  export interface UserInfo {
+    name: string | null;
+    email: string | null;
+    phone: string | null;
+    location: string | null;
+    gender: string | null;
+  }
+  
+  export interface FormState {
+    currentField: keyof UserInfo | null;
+    isComplete: boolean;
+  }
+  

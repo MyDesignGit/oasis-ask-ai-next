@@ -1,3 +1,4 @@
+// app/page.tsx (continued)
 'use client';
 import React from 'react';
 import { useState, useEffect, useRef, KeyboardEvent } from 'react';
@@ -8,36 +9,8 @@ import { UserProfileMenu } from '@/components/UserProfileMenu';
 import { useUser } from '@clerk/nextjs';
 import WelcomeSection from '@/components/WelcomeSection';
 import MessageFormatter from '@/components/MessageFormatter';
-//checking update version
-// Inline type definitions
-interface Message {
-  role: 'assistant' | 'user';
-  content: string;
-}
-
-interface ChatSession {
-  id: string;
-  title: string;
-  messages: Message[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-
-// Constants for storage
-const CHAT_HISTORY_KEY = 'oasis_chat_history';
-const MAX_CHATS = 10;
-
-// Storage utility functions
-const getChatSessions = (): ChatSession[] => {
-  try {
-    const sessions = localStorage.getItem(CHAT_HISTORY_KEY);
-    return sessions ? JSON.parse(sessions) : [];
-  } catch (error) {
-    console.error('Error getting chat sessions:', error);
-    return [];
-  }
-};
+import { Message, ChatSession, UserInfo, FormState } from '@/types';
+import { CHAT_HISTORY_KEY, USER_INFO_KEY, getChatSessions, saveChatSession, updateChatSession } from '@/utils/storage';
 
 export default function ChatPage() {
   const { user } = useUser();
@@ -48,44 +21,46 @@ export default function ChatPage() {
   const [showWelcome, setShowWelcome] = useState(true);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [recentChats, setRecentChats] = useState<ChatSession[]>([]);
+  const [userInfo, setUserInfo] = useState<UserInfo>({
+    name: null,
+    email: null,
+    phone: null,
+    location: null,
+    gender: null
+  });
+  const [formState, setFormState] = useState<FormState>({
+    currentField: null,
+    isComplete: false
+  });
+  const [savedPrompt, setSavedPrompt] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
-  // Load chat sessions on mount
+  // Load saved user info and chat sessions
   useEffect(() => {
+    const savedUserInfo = localStorage.getItem(USER_INFO_KEY);
+    if (savedUserInfo) {
+      const parsedInfo = JSON.parse(savedUserInfo);
+      setUserInfo(parsedInfo);
+      setFormState({ currentField: null, isComplete: true });
+    }
     setRecentChats(getChatSessions());
   }, []);
 
+  // Save user info when it changes
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (window.innerWidth <= 1024 && 
-          sidebarRef.current && 
-          !sidebarRef.current.contains(event.target as Node)) {
-        setIsSidebarOpen(false);
-      }
+    if (userInfo && Object.values(userInfo).some(value => value !== null)) {
+      localStorage.setItem(USER_INFO_KEY, JSON.stringify(userInfo));
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [userInfo]);
 
+  // Scroll to bottom when messages change
   useEffect(() => {
-    const handleResize = () => {
-      setIsSidebarOpen(window.innerWidth > 1024);
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
   }, [messages]);
 
+  // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'inherit';
@@ -94,129 +69,50 @@ export default function ChatPage() {
     }
   }, [input]);
 
-  // Chat session management functions
-  const saveChatSession = (messages: Message[]): string => {
-    try {
-      const firstUserMessage = messages.find(m => m.role === 'user')?.content;
-      const title = firstUserMessage
-        ? firstUserMessage.slice(0, 30) + (firstUserMessage.length > 30 ? '...' : '')
-        : 'New Chat';
-
-      const newSession: ChatSession = {
-        id: crypto.randomUUID(),
-        title,
-        messages,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      const existingSessions = getChatSessions();
-      const updatedSessions = [newSession, ...existingSessions].slice(0, MAX_CHATS);
-      localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(updatedSessions));
-      setRecentChats(updatedSessions);
-      return newSession.id;
-    } catch (error) {
-      console.error('Error saving chat session:', error);
-      return '';
-    }
-  };
-
-  const updateChatSession = (sessionId: string, messages: Message[]): boolean => {
-    try {
-      const sessions = getChatSessions();
-      const sessionIndex = sessions.findIndex(s => s.id === sessionId);
-      
-      if (sessionIndex === -1) return false;
-
-      sessions[sessionIndex] = {
-        ...sessions[sessionIndex],
-        messages,
-        updatedAt: new Date().toISOString(),
-      };
-
-      localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(sessions));
-      setRecentChats(sessions);
-      return true;
-    } catch (error) {
-      console.error('Error updating chat session:', error);
-      return false;
-    }
-  };
-
-  const loadChatSession = (sessionId: string) => {
-    const sessions = getChatSessions();
-    const session = sessions.find(s => s.id === sessionId);
-    if (session) {
-      setMessages(session.messages);
-      setCurrentSessionId(sessionId);
-      setShowWelcome(false);
-      if (window.innerWidth <= 1024) {
-        setIsSidebarOpen(false);
-      }
-    }
-  };
-
-  const deleteChatSession = (sessionId: string) => {
-    try {
-      const sessions = getChatSessions();
-      const updatedSessions = sessions.filter(s => s.id !== sessionId);
-      localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(updatedSessions));
-      setRecentChats(updatedSessions);
-      if (currentSessionId === sessionId) {
-        handleNewChat();
-      }
-      return true;
-    } catch (error) {
-      console.error('Error deleting chat session:', error);
-      return false;
-    }
-  };
-
-  const handleNewChat = () => {
-    setMessages([]);
-    setCurrentSessionId(null);
-    setShowWelcome(true);
-    if (window.innerWidth <= 1024) {
-      setIsSidebarOpen(false);
-    }
-  };
-
-  const handleKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
-  const handlePromptClick = (prompt: string) => {
-    setInput(prompt);
-    handleSendMessage();
-  };
-
-  const handleSendMessage = async () => {
+  const processUserInput = async () => {
     if (!input.trim() || isLoading) return;
 
-    setShowWelcome(false);
-    const userMessage: Message = { 
-      role: 'user',
-      content: input 
-    };
+    const userMessage: Message = { role: 'user', content: input };
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setInput('');
-    setIsLoading(true);
 
-    const sessionId = currentSessionId || saveChatSession(updatedMessages);
-    if (sessionId) {
-      setCurrentSessionId(sessionId);
+    // Handle form state if active
+    if (formState.currentField) {
+      const updatedInfo = { ...userInfo, [formState.currentField]: input };
+      setUserInfo(updatedInfo);
+
+      const fields: (keyof UserInfo)[] = ['name', 'phone', 'email', 'location', 'gender'];
+      const currentIndex = fields.indexOf(formState.currentField);
+      const nextField = currentIndex < fields.length - 1 ? fields[currentIndex + 1] : null;
+
+      if (nextField) {
+        setFormState({ currentField: nextField, isComplete: false });
+        const promptMessage: Message = {
+          role: 'assistant',
+          content: `Thank you. Could you please provide your ${nextField}?`
+        };
+        setMessages(prev => [...prev, promptMessage]);
+      } else {
+        setFormState({ currentField: null, isComplete: true });
+        if (savedPrompt) {
+          await handleAIResponse(savedPrompt);
+          setSavedPrompt(null);
+        }
+      }
+    } else {
+      await handleAIResponse(input);
     }
+  };
 
+  const handleAIResponse = async (userInput: string) => {
+    setIsLoading(true);
     try {
       const response = await fetch('/api', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: updatedMessages,
+          messages: [...messages, { role: 'user', content: userInput }],
         }),
       });
 
@@ -227,11 +123,8 @@ export default function ChatPage() {
       let accumulatedResponse = '';
       const decoder = new TextDecoder();
 
-      const assistantMessage: Message = { 
-        role: 'assistant',
-        content: '' 
-      };
-      setMessages([...updatedMessages, assistantMessage]);
+      const assistantMessage: Message = { role: 'assistant', content: '' };
+      setMessages(prev => [...prev, assistantMessage]);
 
       while (true) {
         const { value, done } = await reader.read();
@@ -249,58 +142,95 @@ export default function ChatPage() {
               const formattedResponse = accumulatedResponse
                 .replace(/\n{3,}/g, '\n\n')
                 .replace(/(?<!\n)###/g, '\n###')
-                .replace(/\*\*(?!\s)(.+?)(?<!\s)\*\*/g, '**$1**')
                 .trim();
 
-              const updatedMessagesWithResponse: Message[] = [
-                ...updatedMessages,
+              setMessages(prev => [
+                ...prev.slice(0, -1),
                 { role: 'assistant', content: formattedResponse }
-              ];
-              
-              setMessages(updatedMessagesWithResponse);
-              
-              if (sessionId) {
-                updateChatSession(sessionId, updatedMessagesWithResponse);
-              }
+              ]);
             } catch (e) {
               console.warn('JSON parse error:', e);
             }
           }
         }
       }
+
+      // Update chat session
+      if (!currentSessionId) {
+        const sessionId = saveChatSession([...messages, { role: 'user', content: userInput }]);
+        setCurrentSessionId(sessionId);
+      } else {
+        updateChatSession(currentSessionId, [...messages, { role: 'user', content: userInput }]);
+      }
+
     } catch (error) {
       console.error('Error:', error);
-      const errorMessage: Message = { 
-        role: 'assistant', 
-        content: 'Sorry, I encountered an error. Please try again.' 
+      const errorMessage: Message = {
+        role: 'assistant',
+        content: 'Sorry, I encountered an error. Please try again.'
       };
-      setMessages([...updatedMessages, errorMessage]);
-      if (currentSessionId) {
-        updateChatSession(currentSessionId, [...updatedMessages, errorMessage]);
-      }
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
+    }
+  };
+
+  const handlePromptClick = (prompt: string) => {
+    setShowWelcome(false);
+    if (!formState.isComplete && !userInfo.name) {
+      setSavedPrompt(prompt);
+      setFormState({ currentField: 'name', isComplete: false });
+      const welcomeMessage: Message = {
+        role: 'assistant',
+        content: 'Welcome! Before we proceed, could you please tell me your name?'
+      };
+      setMessages([welcomeMessage]);
+    } else {
+      const userMessage: Message = { role: 'user', content: prompt };
+      setMessages(prev => [...prev, userMessage]);
+      handleAIResponse(prompt);
+    }
+  };
+
+  const handleKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      processUserInput();
+    }
+  };
+
+  const handleNewChat = () => {
+    setMessages([]);
+    setCurrentSessionId(null);
+    setShowWelcome(true);
+    setSavedPrompt(null);
+    if (window.innerWidth <= 1024) {
+      setIsSidebarOpen(false);
+    }
+  };
+
+  const loadChatSession = (sessionId: string) => {
+    const sessions = getChatSessions();
+    const session = sessions.find(s => s.id === sessionId);
+    if (session) {
+      setMessages(session.messages);
+      setCurrentSessionId(sessionId);
+      setShowWelcome(false);
+      if (window.innerWidth <= 1024) {
+        setIsSidebarOpen(false);
       }
     }
   };
 
-  const Message = ({ content, isUser }: { content: string; isUser: boolean }) => (
-    <div
-      className={`max-w-[80%] p-4 rounded-lg ${
-        isUser
-          ? 'bg-[#874487] text-white ml-auto'
-          : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
-      }`}
-    >
-      {isUser ? (
-        <p>{content}</p>
-      ) : (
-        <MessageFormatter content={content} />
-      )}
-    </div>
-  );
+  const deleteChatSession = (sessionId: string) => {
+    const sessions = getChatSessions();
+    const updatedSessions = sessions.filter(s => s.id !== sessionId);
+    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(updatedSessions));
+    setRecentChats(updatedSessions);
+    if (currentSessionId === sessionId) {
+      handleNewChat();
+    }
+  };
 
   return (
     <div className="flex h-screen bg-white dark:bg-gray-900 transition-colors duration-200">
@@ -349,36 +279,36 @@ export default function ChatPage() {
         </div>
 
         {/* Recent Chats */}
-<div className="flex-1 overflow-y-auto p-4">
-  <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-    Recent
-  </h3>
-  {recentChats.map((chat) => (
-    <div
-      key={chat.id}
-      className={`w-full mb-1 flex items-center justify-between p-2
-        text-gray-600 dark:text-gray-300 hover:bg-gray-100 
-        dark:hover:bg-gray-800 rounded-lg transition-colors group cursor-pointer
-        ${currentSessionId === chat.id ? 'bg-gray-100 dark:bg-gray-800' : ''}`}
-      onClick={() => loadChatSession(chat.id)}
-    >
-      <div className="flex items-center gap-2 flex-1 min-w-0">
-        <MessageSquare size={20} />
-        <span className="text-sm truncate">{chat.title}</span>
-      </div>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          deleteChatSession(chat.id);
-        }}
-        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 
-          dark:hover:bg-gray-700 rounded transition-opacity"
-      >
-        <Trash2 size={16} />
-      </button>
-    </div>
-  ))}
-</div>
+        <div className="flex-1 overflow-y-auto p-4">
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+            Recent
+          </h3>
+          {recentChats.map((chat) => (
+            <div
+              key={chat.id}
+              className={`w-full mb-1 flex items-center justify-between p-2
+                text-gray-600 dark:text-gray-300 hover:bg-gray-100 
+                dark:hover:bg-gray-800 rounded-lg transition-colors group cursor-pointer
+                ${currentSessionId === chat.id ? 'bg-gray-100 dark:bg-gray-800' : ''}`}
+              onClick={() => loadChatSession(chat.id)}
+            >
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <MessageSquare size={20} />
+                <span className="text-sm truncate">{chat.title}</span>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteChatSession(chat.id);
+                }}
+                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 
+                  dark:hover:bg-gray-700 rounded transition-opacity"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
 
         {/* Phone Button */}
         <div className="p-4 border-t border-gray-200 dark:border-gray-800">
@@ -417,7 +347,7 @@ export default function ChatPage() {
           <div className="max-w-4xl mx-auto space-y-4">
             {showWelcome ? (
               <WelcomeSection
-                username={user?.firstName || ''}
+                username={userInfo?.name || user?.firstName || ''}
                 onPromptClick={handlePromptClick}
               />
             ) : (
@@ -426,21 +356,25 @@ export default function ChatPage() {
                   key={index}
                   className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <Message content={msg.content} isUser={msg.role === 'user'} />
+                  <div
+                    className={`max-w-[80%] p-4 rounded-lg ${
+                      msg.role === 'user'
+                        ? 'bg-[#874487] text-white ml-auto'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
+                    }`}
+                  >
+                    {msg.role === 'user' ? (
+                      <p>{msg.content}</p>
+                    ) : (
+                      <MessageFormatter content={msg.content} />
+                    )}
+                  </div>
                 </div>
               ))
             )}
             <div ref={messagesEndRef} />
           </div>
         </div>
-
-        {/* Status Message */}
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-          {isLoading 
-            ? "Thinking..." 
-            : "Ask me anything about fertility treatments and services at Oasis Fertility"
-          }
-        </p>
 
         {/* Input Area */}
         <div className="p-6">
@@ -451,7 +385,13 @@ export default function ChatPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyPress}
-              placeholder={isLoading ? "Please wait..." : "Message Ask Oasis... (Shift + Enter for new line)"}
+              placeholder={
+                isLoading 
+                  ? "Please wait..." 
+                  : formState.currentField
+                    ? `Enter your ${formState.currentField}...`
+                    : "Message Ask Oasis... (Shift + Enter for new line)"
+              }
               className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 
                 bg-white dark:bg-gray-800 
                 text-gray-900 dark:text-gray-100 
@@ -459,10 +399,9 @@ export default function ChatPage() {
                 focus:border-[#874487] dark:focus:border-[#ff9b9b] 
                 focus:ring-1 focus:ring-[#874487] dark:focus:ring-[#ff9b9b] 
                 outline-none transition-colors resize-none max-h-48"
-              disabled={isLoading}
             />
             <button
-              onClick={handleSendMessage}
+              onClick={processUserInput}
               disabled={!input.trim() || isLoading}
               className={`absolute right-4 top-1/2 -translate-y-1/2 ${
                 !input.trim() || isLoading 
