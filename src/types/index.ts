@@ -1,10 +1,4 @@
 // types/index.ts
-export interface Message {
-    id: string;
-    role: 'user' | 'assistant';
-    content: string;
-    timestamp: Date;
-  }
   
   export interface Chat {
     id: string;
@@ -21,6 +15,19 @@ export interface Message {
   }
   
 
+ 
+  
+
+  
+ 
+
+  export interface Message {
+    id: string;
+    timestamp: string;
+    role: 'assistant' | 'user';
+    content: string;
+  }
+  
   export interface ChatSession {
     id: string;
     title: string;
@@ -41,4 +48,5 @@ export interface Message {
     currentField: keyof UserInfo | null;
     isComplete: boolean;
   }
+  
   

@@ -72,7 +72,12 @@ export default function ChatPage() {
   const processUserInput = async () => {
     if (!input.trim() || isLoading) return;
 
-    const userMessage: Message = { role: 'user', content: input };
+    const userMessage: Message = {
+      id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      role: 'user',
+      content: input
+    };
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setInput('');
@@ -81,14 +86,16 @@ export default function ChatPage() {
     if (formState.currentField) {
       const updatedInfo = { ...userInfo, [formState.currentField]: input };
       setUserInfo(updatedInfo);
-
+  
       const fields: (keyof UserInfo)[] = ['name', 'phone', 'email', 'location', 'gender'];
       const currentIndex = fields.indexOf(formState.currentField);
       const nextField = currentIndex < fields.length - 1 ? fields[currentIndex + 1] : null;
-
+  
       if (nextField) {
         setFormState({ currentField: nextField, isComplete: false });
         const promptMessage: Message = {
+          id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
           role: 'assistant',
           content: `Thank you. Could you please provide your ${nextField}?`
         };
@@ -112,7 +119,12 @@ export default function ChatPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...messages, { role: 'user', content: userInput }],
+          messages: [...messages, { 
+            id: crypto.randomUUID(),
+            timestamp: new Date().toISOString(),
+            role: 'user', 
+            content: userInput 
+          }],
         }),
       });
 
@@ -123,8 +135,13 @@ export default function ChatPage() {
       let accumulatedResponse = '';
       const decoder = new TextDecoder();
 
-      const assistantMessage: Message = { role: 'assistant', content: '' };
-      setMessages(prev => [...prev, assistantMessage]);
+      const assistantMessage: Message = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        role: 'assistant',
+        content: ''
+      };
+      setMessages(prev => [...prev, assistantMessage])
 
       while (true) {
         const { value, done } = await reader.read();
@@ -144,10 +161,13 @@ export default function ChatPage() {
                 .replace(/(?<!\n)###/g, '\n###')
                 .trim();
 
-              setMessages(prev => [
-                ...prev.slice(0, -1),
-                { role: 'assistant', content: formattedResponse }
-              ]);
+                setMessages(prev => [
+                  ...prev.slice(0, -1),
+                  {
+                    ...prev[prev.length - 1],
+                    content: formattedResponse
+                  }
+                ]);
             } catch (e) {
               console.warn('JSON parse error:', e);
             }
@@ -166,6 +186,8 @@ export default function ChatPage() {
     } catch (error) {
       console.error('Error:', error);
       const errorMessage: Message = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
         role: 'assistant',
         content: 'Sorry, I encountered an error. Please try again.'
       };
@@ -181,17 +203,24 @@ export default function ChatPage() {
       setSavedPrompt(prompt);
       setFormState({ currentField: 'name', isComplete: false });
       const welcomeMessage: Message = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
         role: 'assistant',
         content: 'Welcome! Before we proceed, could you please tell me your name?'
       };
       setMessages([welcomeMessage]);
     } else {
-      const userMessage: Message = { role: 'user', content: prompt };
+      const userMessage: Message = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        role: 'user',
+        content: prompt
+      };
       setMessages(prev => [...prev, userMessage]);
       handleAIResponse(prompt);
     }
   };
-
+  
   const handleKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
